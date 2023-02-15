@@ -82,7 +82,7 @@ const generateCard = (
       referenceItems = message.sourceAttributions
       suggestedItems = message.suggestedResponses
       let text = message.text
-      const reg = RegExp(/\[\^([0-9]+)\^]/g)
+      let reg = RegExp(/\[\^([0-9]+)\^]/g)
       let result
       while (result = reg.exec(message.text)) {
         const index = result[1]
@@ -92,7 +92,18 @@ const generateCard = (
             `(${referenceItems[Number(index) - 1].seeMoreUrl})`
             : ` [${index}]`)
       }
+
       text = text.replace(/\[\^([0-9]+|)(\^|)/g, '')
+
+      reg = RegExp(/```(\w*)\n/g)
+      while (result = reg.exec(message.text)) {
+        const language = result[1]
+        text = text.replace('```' + language + '\n',
+          language ? `[Code: ${language}]` : `[Code]`)
+      }
+
+      text = text.replace(/\n```/g, '\n')
+
       messageItems.push({
         type: 'answer',
         text
