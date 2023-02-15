@@ -105,6 +105,8 @@ export class BingChat {
         })
 
         this.ws.on('message', (data) => {
+          if (this.ws!.readyState !== WebSocket.OPEN) return
+
           const objects = data.toString().split(terminalChar).filter(Boolean)
           if (objects.length === 0) return
 
