@@ -16,15 +16,37 @@ export class BingChat {
     }
   }
 
-  ws!: WebSocket
+  ws?: WebSocket
+
+  conversationExpired = true
+  conversationId?: string
+  clientId?: string
+  conversationSignature?: string
+  isStartOfSession = true
+
+  conversationTimer?: NodeJS.Timeout
+  respondTimer?: NodeJS.Timeout
 
   send (content: any) {
-    this.ws.send(JSON.stringify(content) + terminalChar)
+    this.ws!.send(JSON.stringify(content) + terminalChar)
+  }
+
+  keepalive () {
+    this.send({ type: 6 })
   }
 
   cleanup () {
-    this.ws.close()
-    this.ws.removeAllListeners()
+    this.conversationTimer && clearTimeout(this.conversationTimer)
+    this.respondTimer && clearTimeout(this.respondTimer)
+    this.ws!.terminate()
+    this.ws = undefined
+    this.conversationExpired = true
+    this.conversationId = undefined
+    this.clientId = undefined
+    this.conversationSignature = undefined
+    this.isStartOfSession = true
+    this.conversationTimer = undefined
+    this.respondTimer = undefined
   }
 
   async sendMessage (
@@ -40,31 +62,28 @@ export class BingChat {
       location
     } = opts
 
-    let { conversationId, clientId, conversationSignature } = opts
-    const isStartOfSession = !conversationId || !clientId ||
-      !conversationSignature
-
-    if (!conversationId || !clientId || !conversationSignature) {
-      const conversation = await this.createConversation()
-      conversationId = conversation.conversationId
-      clientId = conversation.clientId
-      conversationSignature = conversation.conversationSignature
-    }
+    if (this.conversationExpired) await this.initConversation()
 
     const result: types.ChatMessage = {
       author: 'bot',
       id: crypto.randomUUID(),
-      conversationId,
-      clientId,
-      conversationSignature,
+      conversationId: this.conversationId!,
+      clientId: this.clientId!,
+      conversationSignature: this.conversationSignature!,
       invocationId: `${parseInt(invocationId, 10) + 1}`,
       text: ''
     }
 
-    const responseP = new Promise<types.ChatMessage>(
+    return new Promise<types.ChatMessage>(
       async (resolve, reject) => {
-
-        let isFulfilled = false
+        let received = 0
+        const resetRespondTimer = () => {
+          this.respondTimer && clearTimeout(this.respondTimer)
+          this.respondTimer = setTimeout(() => {
+            this.cleanup()
+            reject(new Error(`Message waiting in WebSocket has timed out`))
+          }, 8000)
+        }
 
         this.ws = new WebSocket(
           env.BING_WS_URL || 'wss://sydney.bing.com/sydney/ChatHub', {
@@ -73,51 +92,47 @@ export class BingChat {
               'accept-language': 'en-US,en;q=0.9',
               'cache-control': 'no-cache',
               pragma: 'no-cache'
-            }
+            },
+            handshakeTimeout: 5000
           })
 
         this.ws.on('error', (error) => {
-          console.warn('WebSocket error:', error)
           this.cleanup()
-          if (!isFulfilled) {
-            isFulfilled = true
-            reject(new Error(`WebSocket error: ${error.toString()}`))
-          }
+          reject(new Error(`WebSocket error: ${error.toString()}`))
         })
         this.ws.on('close', () => {
-          // TODO
+          this.cleanup()
         })
 
         this.ws.on('open', () => {
+          resetRespondTimer()
           this.send({ protocol: 'json', version: 1 })
         })
-        let stage = 0
 
         this.ws.on('message', (data) => {
-          const objects = data.toString().split(terminalChar)
-          console.log('message', objects)
+          const objects = data.toString().split(terminalChar).filter(Boolean)
+          if (objects.length === 0) return
+
+          resetRespondTimer()
+          const initialized = objects.length === 1 && objects[0] === '{}'
           const messages = objects.map((object) => {
             try {
               return JSON.parse(object)
             } catch (error) {
               return object
             }
-          }).filter(Boolean)
+          })
 
-          if (!messages.length) {
-            return
+          if (received++ % 10 === 0) {
+            this.keepalive()
           }
 
-          if (stage === 0) {
-            this.send({type:6})
-
+          if (initialized) {
             const traceId = crypto.randomBytes(16).toString('hex')
 
-            // example location: 'lat:47.639557;long:-122.128159;re=1000m;'
             const locationStr = location
-              ? `lat:${location.lat};long:${location.lng};re=${
-                location.re || '1000m'
-              };`
+              ? `lat:${location.lat};long:${location.lng};re=${location.re ||
+              '1000m'};`
               : undefined
 
             const params = {
@@ -143,7 +158,7 @@ export class BingChat {
                   ],
                   sliceIds: [],
                   traceId,
-                  isStartOfSession,
+                  isStartOfSession: this.isStartOfSession,
                   message: {
                     locale,
                     market,
@@ -154,9 +169,9 @@ export class BingChat {
                     messageType: 'Chat',
                     text
                   },
-                  conversationSignature,
-                  participant: { id: clientId },
-                  conversationId
+                  conversationSignature: this.conversationSignature,
+                  participant: { id: this.clientId },
+                  conversationId: this.conversationId
                 }
               ],
               invocationId,
@@ -165,73 +180,55 @@ export class BingChat {
             }
 
             this.send(params)
+            this.isStartOfSession = false
+            this.resetConversationTimer()
+          } else {
+            for (const message of messages) {
+              if (message.type === 1) {
+                const update = message as types.ChatUpdate
+                const msg = update.arguments[0].messages[0]
 
-            ++stage
-            return
-          }
+                if (!msg.messageType) {
+                  result.author = msg.author
+                  result.text = msg.text
+                  result.detail = msg
 
-          for (const message of messages) {
-            // console.log(JSON.stringify(message, null, 2))
+                  onProgress?.(result)
+                }
+              } else if (message.type === 2) {
+                const response = message as types.ChatUpdateCompleteResponse
+                const validMessages = response.item.messages?.filter(
+                  (m) => !m.messageType
+                )
+                const lastMessage = validMessages?.[validMessages?.length - 1]
 
-            if (message.type === 1) {
-              const update = message as types.ChatUpdate
-              const msg = update.arguments[0].messages[0]
+                if (lastMessage) {
+                  result.conversationId = response.item.conversationId
+                  result.conversationExpiryTime =
+                    response.item.conversationExpiryTime
 
-              // console.log('RESPONSE0', JSON.stringify(update, null, 2))
+                  result.author = lastMessage.author
+                  result.text = lastMessage.text
+                  result.detail = lastMessage
 
-              if (!msg.messageType) {
-                result.author = msg.author
-                result.text = msg.text
-                result.detail = msg
-
-                onProgress?.(result)
-              }
-            } else if (message.type === 2) {
-              const response = message as types.ChatUpdateCompleteResponse
-              const validMessages = response.item.messages?.filter(
-                (m) => !m.messageType
-              )
-              const lastMessage = validMessages?.[validMessages?.length - 1]
-
-              if (lastMessage) {
-                result.conversationId = response.item.conversationId
-                result.conversationExpiryTime =
-                  response.item.conversationExpiryTime
-
-                result.author = lastMessage.author
-                result.text = lastMessage.text
-                result.detail = lastMessage
-
-                if (!isFulfilled) {
-                  isFulfilled = true
+                  this.cleanup()
                   resolve(result)
                 }
-              }
-            } else if (message.type === 3) {
-              if (!isFulfilled) {
-                isFulfilled = true
+              } else if (message.type === 3) {
+                this.cleanup()
                 resolve(result)
+              } else {
+                // TODO: handle other message types
               }
-
-              this.cleanup()
-              return
-            } else {
-              // TODO: handle other message types
-              // these may be for displaying "adaptive cards"
-              // console.warn('unexpected message type', message.type, message)
             }
           }
         })
       }
     )
-
-    return responseP
   }
 
-  async createConversation (): Promise<types.ConversationResult> {
-    const requestId = crypto.randomUUID()
-
-    return fetch('https://www.bing.com/turing/conversation/create', {
+  async initConversation (): Promise<types.ConversationResult> {
+    const res = await fetch('https://www.bing.com/turing/conversation/create', {
       headers: {
         accept: 'application/json',
         'accept-language': 'en-US,en;q=0.9',
@@ -251,7 +248,7 @@ export class BingChat {
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
         'x-edge-shopping-flag': '1',
-        'x-ms-client-request-id': requestId,
+        'x-ms-client-request-id': crypto.randomUUID(),
         'x-ms-useragent':
           'azsdk-js-api-client-factory/1.0.0-beta.1 core-rest-pipeline/1.10.0 OS/MacIntel',
         cookie: (cookie).includes(';') ? cookie : `_U=${cookie}`
@@ -262,14 +259,27 @@ export class BingChat {
       method: 'GET',
       mode: 'cors',
       credentials: 'include'
-    }).then((res) => {
-      if (res.ok) {
-        return res.json()
-      } else {
-        throw new Error(
-          `unexpected HTTP error createConversation ${res.status}: ${res.statusText}`
-        )
-      }
     })
+    if (res.ok) {
+      const result = await res.json()
+      this.conversationExpired = false
+      this.conversationId = result.conversationId
+      this.clientId = result.clientId
+      this.conversationSignature = result.conversationSignature
+      this.isStartOfSession = true
+      this.resetConversationTimer()
+      return result
+    } else {
+      throw new Error(
+        `unexpected HTTP error initConversation ${res.status}: ${res.statusText}`
+      )
+    }
+  }
+
+  resetConversationTimer () {
+    this.conversationTimer && clearTimeout(this.conversationTimer)
+    this.conversationTimer = setTimeout(() => {
+      this.cleanup()
+    }, 3600 * 24)
   }
 }
