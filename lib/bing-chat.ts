@@ -17,8 +17,6 @@ export class BingChat {
     }
   }
 
-  ws?: WebSocket
-
   initializingConversation = false
   initConversationCallback: [any, any][] = []
   conversationExpired = true
@@ -28,21 +26,8 @@ export class BingChat {
   isStartOfSession = true
 
   conversationTimer?: NodeJS.Timeout
-  respondTimer?: NodeJS.Timeout
-
-  send (content: any) {
-    this.ws?.send(JSON.stringify(content) + terminalChar)
-  }
-
-  keepalive () {
-    this.send({ type: 6 })
-  }
 
   cleanup () {
-    this.conversationTimer && clearTimeout(this.conversationTimer)
-    this.respondTimer && clearTimeout(this.respondTimer)
-    this.ws?.terminate()
-    this.ws = undefined
     this.initializingConversation = false
     this.initConversationCallback = []
     this.conversationExpired = true
@@ -50,8 +35,8 @@ export class BingChat {
     this.clientId = undefined
     this.conversationSignature = undefined
     this.isStartOfSession = true
+    this.conversationTimer && clearTimeout(this.conversationTimer)
     this.conversationTimer = undefined
-    this.respondTimer = undefined
   }
 
   async sendMessage (
@@ -74,15 +59,8 @@ export class BingChat {
     return new Promise<types.ChatMessageFull[]>(
       async (resolve, reject) => {
         let received = 0
+        let respondTimer: NodeJS.Timeout | undefined
         let updateMessages: types.ChatMessagePartial[] = []
-
-        const resetRespondTimer = () => {
-          this.respondTimer && clearTimeout(this.respondTimer)
-          this.respondTimer = setTimeout(() => {
-            this.cleanup()
-            reject(new Error(`Message waiting in WebSocket has timed out`))
-          }, 8000)
-        }
 
         const ws = new WebSocket(
           env.BING_WS_URL || 'wss://sydney.bing.com/sydney/ChatHub', {
@@ -95,17 +73,39 @@ export class BingChat {
             handshakeTimeout: 5000
           })
 
+        const send = (content: any) => {
+          ws.send(JSON.stringify(content) + terminalChar)
+        }
+
+        const keepalive = () => {
+          send({ type: 6 })
+        }
+
+        const terminate = () => {
+          respondTimer && clearTimeout(respondTimer)
+          respondTimer = undefined
+          ws.terminate()
+        }
+
+        const resetRespondTimer = () => {
+          respondTimer && clearTimeout(respondTimer)
+          respondTimer = setTimeout(() => {
+            terminate()
+            reject(new Error(`Message waiting in WebSocket has timed out`))
+          }, 8000)
+        }
+
         ws.on('error', (error) => {
-          this.cleanup()
+          terminate()
           reject(new Error(`WebSocket error: ${error.toString()}`))
         })
         ws.on('close', () => {
-          this.cleanup()
+          terminate()
         })
 
         ws.on('open', () => {
           resetRespondTimer()
-          this.send({ protocol: 'json', version: 1 })
+          send({ protocol: 'json', version: 1 })
         })
 
         ws.on('message', (data) => {
@@ -123,7 +123,7 @@ export class BingChat {
           })
 
           if (received++ % 10 === 0) {
-            this.keepalive()
+            keepalive()
           }
 
           if (initialized) {
@@ -177,7 +177,7 @@ export class BingChat {
               type: 4
             }
 
-            this.send(params)
+            send(params)
             this.isStartOfSession = false
             this.resetConversationTimer()
           } else {
@@ -198,7 +198,7 @@ export class BingChat {
                 throttledOnProgress?.(updateMessages)
               } else if (message.type === 2) {
                 const response = message as types.ChatUpdateCompleteResponse
-                this.cleanup()
+                terminate()
                 resolve(response.item.messages)
               } else {
                 // TODO: handle other message types
