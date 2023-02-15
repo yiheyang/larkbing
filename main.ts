@@ -73,7 +73,7 @@ const generateCard = (
         text
       })
     } else if (!message.messageType && message.author === 'user') {
-      const text = `🗣️ ** ${message.text} **`
+      const text = `🗣️ ** Question: ${message.text} **`
       messageItems.push({
         type: 'note',
         text
