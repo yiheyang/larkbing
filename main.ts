@@ -342,7 +342,6 @@ const eventDispatcher = new lark.EventDispatcher({
 const cardDispatcher = new lark.CardActionHandler(
   {
     encryptKey: env.LARK_ENCRYPT_KEY,
-    verificationToken: env.LARK_VERIFICATION_TOKEN
   },
   async (data: InteractiveCardActionEvent) => {
     console.log(data.action);
