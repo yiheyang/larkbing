@@ -52,15 +52,14 @@ export class BingChat {
       location
     } = opts
 
-    const throttledOnProgress = onProgress && throttle(onProgress, 500)
-
-    if (this.conversationExpired) await this.initConversation()
-
     return new Promise<types.ChatMessageFull[]>(
       async (resolve, reject) => {
         let received = 0
         let respondTimer: NodeJS.Timeout | undefined
         let updateMessages: types.ChatMessagePartial[] = []
+        const throttledOnProgress = onProgress && throttle(onProgress, 500)
+
+        if (this.conversationExpired) await this.initConversation()
 
         const ws = new WebSocket(
           env.BING_WS_URL || 'wss://sydney.bing.com/sydney/ChatHub', {
