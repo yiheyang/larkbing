@@ -39,7 +39,8 @@ async function reply (
 const generateCard = (content: string) => {
   return JSON.stringify({
     'config': {
-      'wide_screen_mode': true
+      'wide_screen_mode': true,
+      'update_multi': true
     },
     'elements': [
       {
@@ -188,6 +189,7 @@ const eventDispatcher = new lark.EventDispatcher({
     cache.set(`message_id:${messageID}`, true, 3600)
 
     const userID = data.sender.sender_id?.user_id || 'common'
+    console.log(data.sender.sender_id)
 
     const messageHandler = async (content: string) => {
       try {
