@@ -19,7 +19,7 @@ const client = new lark.Client({
   domain: env.LARK_DOMAIN || lark.Domain.Feishu
 })
 
-const session: Record<string, BingChat>  = {}
+const session: Record<string, BingChat> = {}
 
 async function reply (
   messageID: string, content: string) {
@@ -32,6 +32,113 @@ async function reply (
         'text': content
       }),
       msg_type: 'text'
+    }
+  })
+}
+
+const generateCard = (content: string) => {
+  return JSON.stringify({
+    'config': {
+      'wide_screen_mode': true
+    },
+    'elements': [
+      {
+        'tag': 'note',
+        'elements': [
+          {
+            'tag': 'lark_md',
+            'content': '🔍  **Searching** ***你好*** ***food*** ***food***'
+          }
+        ]
+      },
+      {
+        'tag': 'hr'
+      },
+      {
+        'tag': 'markdown',
+        'content': content
+      },
+      {
+        'tag': 'hr'
+      },
+      {
+        'tag': 'div',
+        'text': {
+          'tag': 'lark_md',
+          'content': '**Learn more** / Reference 👉'
+        },
+        'extra': {
+          'tag': 'overflow',
+          'options': [
+            {
+              'text': {
+                'tag': 'plain_text',
+                'content': '打开Lark应用目录'
+              },
+              'value': 'appStore',
+              'url': 'https://app.larksuite.com'
+            },
+            {
+              'text': {
+                'tag': 'plain_text',
+                'content': '打开Lark开发文档'
+              },
+              'value': 'document',
+              'url': 'https://open.larksuite.com'
+            },
+            {
+              'text': {
+                'tag': 'plain_text',
+                'content': '打开Lark官网'
+              },
+              'value': 'document',
+              'url': 'https://www.larksuite.com'
+            }
+          ]
+        }
+      },
+      {
+        'tag': 'action',
+        'actions': [
+          {
+            'tag': 'button',
+            'text': {
+              'tag': 'plain_text',
+              'content': '火星上会有液态水吗？'
+            },
+            'type': 'primary'
+          },
+          {
+            'tag': 'button',
+            'text': {
+              'tag': 'plain_text',
+              'content': '火星是什么时候形成的？'
+            },
+            'type': 'primary'
+          },
+          {
+            'tag': 'button',
+            'text': {
+              'tag': 'plain_text',
+              'content': '火星上有生命吗？'
+            },
+            'type': 'primary'
+          }
+        ]
+      }
+    ]
+  })
+}
+
+async function replyCard (
+  messageID: string, content: string) {
+  return await client.im.message.reply({
+    path: {
+      message_id: messageID
+    },
+    data: {
+      content: generateCard(content),
+      msg_type: 'interactive'
     }
   })
 }
@@ -57,7 +164,7 @@ async function createCompletion (userID: string, question: string) {
   console.info(`[${env.LARK_APP_NAME}] Receive from ${userID}: ${question}`)
 
   try {
-    if(!session[userID]) session[userID] = new BingChat()
+    if (!session[userID]) session[userID] = new BingChat()
 
     const chat = session[userID]
 
@@ -89,7 +196,7 @@ const eventDispatcher = new lark.EventDispatcher({
           return await reply(messageID, '[COMMAND] Session reset successfully.')
         } else {
           const answer = await createCompletion(userID, content)
-          return await reply(messageID, answer)
+          return await replyCard(messageID, answer)
         }
       } catch (errorMessage) {
         if (typeof errorMessage === 'string') {
@@ -112,7 +219,8 @@ const eventDispatcher = new lark.EventDispatcher({
         data.message.mentions.length > 0 && data.message.mentions[0].name ===
         env.LARK_APP_NAME) {
         const userInput = JSON.parse(data.message.content)
-        await messageHandler(userInput.text.replace(/@_user_[0-9]+/g, '').trim())
+        await messageHandler(
+          userInput.text.replace(/@_user_[0-9]+/g, '').trim())
       }
 
     }
