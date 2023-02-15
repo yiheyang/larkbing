@@ -196,10 +196,13 @@ export class BingChat {
 
                 throttledOnProgress?.(updateMessages)
               } else if (message.type === 2) {
-                const response = message as types.ChatUpdateCompleteResponse
                 terminate()
-                console.log(response)
-                resolve(response.item.messages)
+                const response = message as types.ChatUpdateCompleteResponse
+                if (response.item.result.value === 'Success') {
+                  resolve(response.item.messages)
+                } else {
+                  reject(new Error(response.item.result.value))
+                }
               } else {
                 // TODO: handle other message types
               }
