@@ -261,7 +261,6 @@ const eventDispatcher = new lark.EventDispatcher({
           delete session[userID]
           return await reply(messageID, '[COMMAND] Session reset successfully.')
         } else {
-
           let cardID: string | undefined
           let replyStatus: 'noReply' | 'replying' | 'replied' | 'end' | string = 'noReply'
           let chatMessage: ChatMessageFull[] | undefined

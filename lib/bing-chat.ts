@@ -256,7 +256,6 @@ export class BingChat {
         this.conversationSignature = result.conversationSignature
         this.isStartOfSession = true
         this.resetConversationTimer()
-        console.log(this.initConversationCallback.length)
         this.initConversationCallback.forEach(([_res]) => _res())
       } else {
         this.initConversationCallback.forEach(([, _rej]) => _rej(new Error(
