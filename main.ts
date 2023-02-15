@@ -3,7 +3,7 @@ import * as lark from '@larksuiteoapi/node-sdk'
 import bodyParser from 'body-parser'
 import nodeCache from 'node-cache'
 import dotenv from 'dotenv'
-import { BingChat } from './lib'
+import { BingChat, ChatMessage } from './lib'
 
 const cache = new nodeCache()
 
@@ -144,6 +144,18 @@ async function replyCard (
   })
 }
 
+async function updateCard (
+  messageID: string, content: string) {
+  return await client.im.message.patch({
+    path: {
+      message_id: messageID
+    },
+    data: {
+      content: generateCard(content)
+    }
+  })
+}
+
 function errorHandler (error: any) {
   if (error.response) {
     const errorMessage = `[ERROR:${error.response.status}] ${JSON.stringify(
@@ -161,7 +173,9 @@ function errorHandler (error: any) {
   }
 }
 
-async function createCompletion (userID: string, question: string) {
+async function createCompletion (
+  userID: string, question: string,
+  onProgress?: (partialResponse: ChatMessage) => void) {
   console.info(`[${env.LARK_APP_NAME}] Receive from ${userID}: ${question}`)
 
   try {
@@ -169,7 +183,7 @@ async function createCompletion (userID: string, question: string) {
 
     const chat = session[userID]
 
-    const result = await chat.sendMessage(question)
+    const result = await chat.sendMessage(question, { onProgress })
     const answer = result.text.trim()
     console.info(`[${env.LARK_APP_NAME}] Reply to ${userID}: ${answer}`)
 
@@ -197,8 +211,17 @@ const eventDispatcher = new lark.EventDispatcher({
           delete session[userID]
           return await reply(messageID, '[COMMAND] Session reset successfully.')
         } else {
-          const answer = await createCompletion(userID, content)
-          return await replyCard(messageID, answer)
+          let cardID: string | undefined
+          const onProgress = async (partialResponse: ChatMessage) => {
+            if (!cardID) {
+              cardID = (await replyCard(messageID,
+                partialResponse.text)).data?.message_id
+            } else {
+              await updateCard(cardID, partialResponse.text)
+            }
+          }
+          const answer = await createCompletion(userID, content, onProgress)
+          return await updateCard(cardID!, answer)
         }
       } catch (errorMessage) {
         if (typeof errorMessage === 'string') {

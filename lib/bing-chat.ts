@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import WebSocket from 'ws'
 import dotenv from 'dotenv'
 import * as types from './types'
+import { throttle } from 'lodash'
 
 dotenv.config()
 const env = process.env
@@ -61,6 +62,8 @@ export class BingChat {
       region = 'US',
       location
     } = opts
+
+    const throttledOnProgress = onProgress && throttle(onProgress, 500)
 
     if (this.conversationExpired) await this.initConversation()
 
@@ -130,10 +133,9 @@ export class BingChat {
           if (initialized) {
             const traceId = crypto.randomBytes(16).toString('hex')
 
-            const locationStr = location
-              ? `lat:${location.lat};long:${location.lng};re=${location.re ||
+            const locationStr = location &&
+              `lat:${location.lat};long:${location.lng};re=${location.re ||
               '1000m'};`
-              : undefined
 
             const params = {
               arguments: [
@@ -193,7 +195,7 @@ export class BingChat {
                   result.text = msg.text
                   result.detail = msg
 
-                  onProgress?.(result)
+                  throttledOnProgress?.(result)
                 }
               } else if (message.type === 2) {
                 const response = message as types.ChatUpdateCompleteResponse
