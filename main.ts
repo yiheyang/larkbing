@@ -70,7 +70,7 @@ const generateCard = (
         emoji = '💡'
       }
 
-      const text = `**${emoji}  ${message.text.replace(/`/g, '*')} **`
+      const text = `${emoji} ** ${message.text.replace(/`/g, '*')} **`
       messageItems.push({
         type: 'note',
         text
