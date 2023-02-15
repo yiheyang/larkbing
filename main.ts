@@ -358,9 +358,7 @@ const cardDispatcher = new lark.CardActionHandler(
       messageHandler(data.action.value.text.replace('ASK----', ''),
         userID, messageID).then()
     }
-    return {
-      elements: []
-    }
+    return null
   }
 )
 
