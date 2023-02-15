@@ -5,19 +5,19 @@ import nodeCache from 'node-cache'
 import dotenv from 'dotenv'
 import {
   BingChat,
-  ChatMessage,
   ChatMessageFull,
   ChatMessagePartial, SourceAttribution, SuggestedResponse
 } from './lib'
 import { InteractiveCardActionEvent } from '@larksuiteoapi/node-sdk'
+import * as http from 'http'
 
 const cache = new nodeCache()
 
 dotenv.config()
 const env = process.env
 
-const app = express()
-app.use(bodyParser.json())
+const server = http.createServer();
+
 
 const client = new lark.Client({
   appId: env.LARK_APP_ID || '',
@@ -350,14 +350,19 @@ const cardDispatcher = new lark.CardActionHandler(
   }
 )
 
-app.use('/', lark.adaptExpress(eventDispatcher, {
-  autoChallenge: true
-}))
+server.on('request', lark.adaptDefault('/', eventDispatcher));
+server.on('request', lark.adaptDefault('/card', cardDispatcher));
+server.listen(env.PORT);
+console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
 
-app.use('/card', lark.adaptExpress(cardDispatcher, {
-  autoChallenge: true
-}))
-
-app.listen(env.PORT, () => {
-  console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
-})
+// app.use('/', lark.adaptExpress(eventDispatcher, {
+//   autoChallenge: true
+// }))
+//
+// app.use('/card', lark.adaptExpress(cardDispatcher, {
+//   autoChallenge: true
+// }))
+//
+// app.listen(env.PORT, () => {
+//   console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
+// })
