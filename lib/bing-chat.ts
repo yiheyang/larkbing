@@ -28,7 +28,7 @@ export class BingChat {
   respondTimer?: NodeJS.Timeout
 
   send (content: any) {
-    this.ws!.send(JSON.stringify(content) + terminalChar)
+    this.ws?.send(JSON.stringify(content) + terminalChar)
   }
 
   keepalive () {
@@ -38,7 +38,7 @@ export class BingChat {
   cleanup () {
     this.conversationTimer && clearTimeout(this.conversationTimer)
     this.respondTimer && clearTimeout(this.respondTimer)
-    this.ws!.terminate()
+    this.ws?.terminate()
     this.ws = undefined
     this.conversationExpired = true
     this.conversationId = undefined
