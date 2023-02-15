@@ -14,7 +14,7 @@ const cache = new nodeCache()
 dotenv.config()
 const env = process.env
 
-const server = http.createServer();
+const server = http.createServer()
 
 const client = new lark.Client({
   appId: env.LARK_APP_ID || '',
@@ -172,7 +172,7 @@ const generateCard = (
       return {
         'tag': 'button',
         'value': {
-          'text': suggestedItem.text
+          'text': `ASK----${suggestedItem.text}`
         },
         'text': {
           'tag': 'plain_text',
@@ -254,6 +254,51 @@ async function createCompletion (
   }
 }
 
+const messageHandler = async (
+  content: string, userID: string, messageID: string) => {
+  try {
+    if (content === '/reset') {
+      delete session[userID]
+      return await reply(messageID, '[COMMAND] Session reset successfully.')
+    } else {
+      let cardID: string | undefined
+      let replyStatus: 'noReply' | 'replying' | 'replied' | 'end' | string = 'noReply'
+      let chatMessage: ChatMessageFull[] | undefined
+      const onProgress = async (partialMessage: ChatMessagePartial[]) => {
+        if (replyStatus === 'replying' || replyStatus === 'end') return
+        if (!cardID) {
+          replyStatus = 'replying'
+          cardID = (await replyCard(messageID,
+            partialMessage, true)).data?.message_id
+          replyStatus = 'replied'
+          if (chatMessage) {
+            replyStatus = 'end'
+            await updateCard(cardID!, chatMessage, false)
+          }
+        } else if (replyStatus !== 'end') {
+          await updateCard(cardID, partialMessage, true)
+        }
+      }
+      chatMessage = await createCompletion(userID, content, onProgress)
+      if (replyStatus === 'noReply') {
+        replyStatus = 'end'
+        await replyCard(messageID, chatMessage, false)
+      }
+
+      if (replyStatus === 'replied') {
+        replyStatus = 'end'
+        await updateCard(cardID!, chatMessage,
+          false)
+      }
+      return
+    }
+  } catch (errorMessage) {
+    if (typeof errorMessage === 'string') {
+      return await reply(messageID, errorMessage)
+    }
+  }
+}
+
 const eventDispatcher = new lark.EventDispatcher({
   encryptKey: env.LARK_ENCRYPT_KEY
 }).register({
@@ -270,55 +315,11 @@ const eventDispatcher = new lark.EventDispatcher({
 
     const userID = data.sender.sender_id?.user_id || 'common'
 
-    const messageHandler = async (content: string) => {
-      try {
-        if (content === '/reset') {
-          delete session[userID]
-          return await reply(messageID, '[COMMAND] Session reset successfully.')
-        } else {
-          let cardID: string | undefined
-          let replyStatus: 'noReply' | 'replying' | 'replied' | 'end' | string = 'noReply'
-          let chatMessage: ChatMessageFull[] | undefined
-          const onProgress = async (partialMessage: ChatMessagePartial[]) => {
-            if (replyStatus === 'replying' || replyStatus === 'end') return
-            if (!cardID) {
-              replyStatus = 'replying'
-              cardID = (await replyCard(messageID,
-                partialMessage, true)).data?.message_id
-              replyStatus = 'replied'
-              if (chatMessage) {
-                replyStatus = 'end'
-                await updateCard(cardID!, chatMessage, false)
-              }
-            } else if (replyStatus !== 'end') {
-              await updateCard(cardID, partialMessage, true)
-            }
-          }
-          chatMessage = await createCompletion(userID, content, onProgress)
-          if (replyStatus === 'noReply') {
-            replyStatus = 'end'
-            await replyCard(messageID, chatMessage, false)
-          }
-
-          if (replyStatus === 'replied') {
-            replyStatus = 'end'
-            await updateCard(cardID!, chatMessage,
-              false)
-          }
-          return
-        }
-      } catch (errorMessage) {
-        if (typeof errorMessage === 'string') {
-          return await reply(messageID, errorMessage)
-        }
-      }
-    }
-
     // private chat
     if (data.message.chat_type === 'p2p') {
       if (data.message.message_type === 'text') {
         const userInput = JSON.parse(data.message.content)
-        await messageHandler(userInput.text)
+        await messageHandler(userInput.text, userID, messageID)
       }
     }
 
@@ -329,7 +330,8 @@ const eventDispatcher = new lark.EventDispatcher({
         env.LARK_APP_NAME) {
         const userInput = JSON.parse(data.message.content)
         await messageHandler(
-          userInput.text.replace(/@_user_[0-9]+/g, '').trim())
+          userInput.text.replace(/@_user_[0-9]+/g, '').trim(), userID,
+          messageID)
       }
 
     }
@@ -343,12 +345,18 @@ const cardDispatcher = new lark.CardActionHandler(
     verificationToken: env.LARK_VERIFICATION_TOKEN
   },
   async (data: InteractiveCardActionEvent) => {
-    console.log(data.action)
+    if (data.action.tag === 'button' &&
+      data.action.value.text.startsWith('ASK----')) {
+      const userID = data.user_id!
+      const messageID = data.open_message_id
+      await messageHandler(data.action.value.text.replace('ASK----', ''),
+        userID, messageID)
+    }
   }
 )
 
-server.on('request', lark.adaptDefault('/event', eventDispatcher));
-server.on('request', lark.adaptDefault('/card', cardDispatcher));
+server.on('request', lark.adaptDefault('/event', eventDispatcher))
+server.on('request', lark.adaptDefault('/card', cardDispatcher))
 
-server.listen(env.PORT);
+server.listen(env.PORT)
 console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
