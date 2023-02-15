@@ -198,6 +198,7 @@ export class BingChat {
               } else if (message.type === 2) {
                 const response = message as types.ChatUpdateCompleteResponse
                 terminate()
+                console.log(response)
                 resolve(response.item.messages)
               } else {
                 // TODO: handle other message types
