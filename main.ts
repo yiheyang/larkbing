@@ -203,7 +203,6 @@ const eventDispatcher = new lark.EventDispatcher({
     cache.set(`message_id:${messageID}`, true, 3600)
 
     const userID = data.sender.sender_id?.user_id || 'common'
-    console.log(data.sender.sender_id)
 
     const messageHandler = async (content: string) => {
       try {
@@ -212,10 +211,14 @@ const eventDispatcher = new lark.EventDispatcher({
           return await reply(messageID, '[COMMAND] Session reset successfully.')
         } else {
           let cardID: string | undefined
+          let replying = false
           const onProgress = async (partialResponse: ChatMessage) => {
+            if (replying) return
             if (!cardID) {
+              replying = true
               cardID = (await replyCard(messageID,
                 partialResponse.text)).data?.message_id
+              replying = false
             } else {
               await updateCard(cardID, partialResponse.text)
             }
