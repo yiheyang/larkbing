@@ -355,16 +355,20 @@ const cardDispatcher = new lark.CardActionHandler(
       data.action.value.text.startsWith('ASK----')) {
       const userID = data.user_id!
       const messageID = data.open_message_id
-      await messageHandler(data.action.value.text.replace('ASK----', ''),
-        userID, messageID)
+      messageHandler(data.action.value.text.replace('ASK----', ''),
+        userID, messageID).then()
     }
-    return {}
+    return {
+      header: {},
+      elements: []
+    }
   }
 )
 
 server.on('request',
   lark.adaptDefault('/event', eventDispatcher, { autoChallenge: true }))
-server.on('request', lark.adaptDefault('/card', cardDispatcher, { autoChallenge: true }))
+server.on('request',
+  lark.adaptDefault('/card', cardDispatcher, { autoChallenge: true }))
 
 server.listen(env.PORT)
 console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
