@@ -3,7 +3,12 @@ import * as lark from '@larksuiteoapi/node-sdk'
 import bodyParser from 'body-parser'
 import nodeCache from 'node-cache'
 import dotenv from 'dotenv'
-import { BingChat, ChatMessage } from './lib'
+import {
+  BingChat,
+  ChatMessage,
+  ChatMessageFull,
+  ChatMessagePartial, SourceAttribution, SuggestedResponse
+} from './lib'
 
 const cache = new nodeCache()
 
@@ -36,8 +41,41 @@ async function reply (
   })
 }
 
-const generateCard = (content: string) => {
-  return JSON.stringify({
+const generateCard = (
+  messages: (ChatMessagePartial | ChatMessageFull)[], updating = false) => {
+  interface Note {
+    type: 'note'
+    text: string
+  }
+
+  interface Answer {
+    type: 'answer',
+    text: string
+  }
+
+  let messageItems: (Note | Answer)[] = []
+  let referenceItems: SourceAttribution[] | undefined
+  let suggestedItems: SuggestedResponse[] | undefined
+
+  for (const message of messages) {
+    if (message.messageType === 'RenderCardRequest' || !message.text) {
+      // do nothing
+    } else if (message.messageType) {
+      messageItems.push({
+        type: 'note',
+        text: message.text
+      })
+    } else if (!message.messageType) {
+      messageItems.push({
+        type: 'answer',
+        text: message.text
+      })
+      referenceItems = message.sourceAttributions
+      suggestedItems = message.suggestedResponses
+    }
+  }
+
+  const result = {
     'config': {
       'wide_screen_mode': true,
       'update_multi': true
@@ -48,117 +86,109 @@ const generateCard = (content: string) => {
         'content': 'Updating... ⚙️'
       },
       'template': 'blue'
-    },
-    'elements': [
-      {
+    } as any,
+    'elements': [] as any[]
+  }
+
+  if (!updating) {
+    delete result.header
+  }
+
+  for (const messageItem of messageItems) {
+    if (messageItem.type === 'note') {
+      result.elements.push({
         'tag': 'note',
         'elements': [
           {
             'tag': 'lark_md',
-            'content': '🔍  **Searching** ***你好*** ***food*** ***food***'
+            'content': messageItem.text
           }
         ]
-      },
-      {
-        'tag': 'hr'
-      },
-      {
-        'tag': 'markdown',
-        'content': content
-      },
-      {
-        'tag': 'hr'
-      },
-      {
-        'tag': 'div',
-        'text': {
-          'tag': 'lark_md',
-          'content': '**Learn more** / Reference 👉'
+      })
+    } else if (messageItem.type === 'answer') {
+      result.elements.push({
+          'tag': 'hr'
         },
-        'extra': {
-          'tag': 'overflow',
-          'options': [
-            {
-              'text': {
-                'tag': 'plain_text',
-                'content': '打开Lark应用目录'
-              },
-              'value': 'appStore',
-              'url': 'https://app.larksuite.com'
-            },
-            {
-              'text': {
-                'tag': 'plain_text',
-                'content': '打开Lark开发文档'
-              },
-              'value': 'document',
-              'url': 'https://open.larksuite.com'
-            },
-            {
-              'text': {
-                'tag': 'plain_text',
-                'content': '打开Lark官网'
-              },
-              'value': 'document',
-              'url': 'https://www.larksuite.com'
-            }
-          ]
-        }
-      },
-      {
-        'tag': 'action',
-        'actions': [
-          {
-            'tag': 'button',
-            'text': {
-              'tag': 'plain_text',
-              'content': '火星上会有液态水吗？'
-            },
-            'type': 'primary'
-          },
-          {
-            'tag': 'button',
-            'text': {
-              'tag': 'plain_text',
-              'content': '火星是什么时候形成的？'
-            },
-            'type': 'primary'
-          },
-          {
-            'tag': 'button',
-            'text': {
-              'tag': 'plain_text',
-              'content': '火星上有生命吗？'
-            },
-            'type': 'primary'
-          }
-        ]
+        {
+          'tag': 'markdown',
+          'content': messageItem.text
+        },
+        {
+          'tag': 'hr'
+        })
+    }
+  }
+
+  if (referenceItems && referenceItems.length > 0) {
+    const referenceOptions = referenceItems.map((referenceItem) => {
+      return {
+        'text': {
+          'tag': 'plain_text',
+          'content': referenceItem.providerDisplayName
+        },
+        'value': referenceItem.seeMoreUrl,
+        'url': referenceItem.seeMoreUrl
       }
-    ]
-  })
+    })
+
+    result.elements.push({
+      'tag': 'div',
+      'text': {
+        'tag': 'lark_md',
+        'content': '**Learn more** / Reference 👉'
+      },
+      'extra': {
+        'tag': 'overflow',
+        'options': referenceOptions
+      }
+    })
+  }
+
+  if (suggestedItems && suggestedItems.length > 0) {
+    const suggestedActions = suggestedItems.map((suggestedItem) => {
+      return {
+        'tag': 'button',
+        'value': suggestedItem.text,
+        'text': {
+          'tag': 'plain_text',
+          'content': suggestedItem.text
+        },
+        'type': 'primary'
+      }
+    })
+
+    result.elements.push({
+      'tag': 'action',
+      'actions': suggestedActions
+    })
+  }
+
+  return JSON.stringify(result)
 }
 
 async function replyCard (
-  messageID: string, content: string) {
+  messageID: string, chatMessage: (ChatMessagePartial | ChatMessageFull)[],
+  updating = false) {
   return await client.im.message.reply({
     path: {
       message_id: messageID
     },
     data: {
-      content: generateCard(content),
+      content: generateCard(chatMessage, updating),
       msg_type: 'interactive'
     }
   })
 }
 
 async function updateCard (
-  messageID: string, content: string) {
+  messageID: string, chatMessage: (ChatMessagePartial | ChatMessageFull)[],
+  updating = false) {
   return await client.im.message.patch({
     path: {
       message_id: messageID
     },
     data: {
-      content: generateCard(content)
+      content: generateCard(chatMessage, updating)
     }
   })
 }
@@ -182,7 +212,7 @@ function errorHandler (error: any) {
 
 async function createCompletion (
   userID: string, question: string,
-  onProgress?: (partialResponse: ChatMessage) => void) {
+  onProgress?: (partialMessage: ChatMessagePartial[]) => void) {
   console.info(`[${env.LARK_APP_NAME}] Receive from ${userID}: ${question}`)
 
   try {
@@ -191,10 +221,9 @@ async function createCompletion (
     const chat = session[userID]
 
     const result = await chat.sendMessage(question, { onProgress })
-    const answer = result.text.trim()
-    console.info(`[${env.LARK_APP_NAME}] Reply to ${userID}: ${answer}`)
+    console.info(`[${env.LARK_APP_NAME}] Reply to ${userID}`)
 
-    return answer
+    return result
   } catch (error: any) {
     throw errorHandler(error)
   }
@@ -217,23 +246,36 @@ const eventDispatcher = new lark.EventDispatcher({
           delete session[userID]
           return await reply(messageID, '[COMMAND] Session reset successfully.')
         } else {
+
           let cardID: string | undefined
-          let replying = false
-          let answer: string | undefined
-          const onProgress = async (partialResponse: ChatMessage) => {
-            if (replying) return
+          let replyStatus: 'noReply' | 'replying' | 'replied' | 'end' | string = 'noReply'
+          let chatMessage: ChatMessageFull[] | undefined
+          const onProgress = async (partialMessage: ChatMessagePartial[]) => {
+            if (replyStatus === 'replying' || replyStatus === 'end') return
             if (!cardID) {
-              replying = true
+              replyStatus = 'replying'
               cardID = (await replyCard(messageID,
-                partialResponse.text)).data?.message_id
-              replying = false
-              if (answer) await updateCard(cardID!, answer)
-            } else {
-              await updateCard(cardID, partialResponse.text)
+                partialMessage, true)).data?.message_id
+              replyStatus = 'replied'
+              if (chatMessage) {
+                replyStatus = 'end'
+                await updateCard(cardID!, chatMessage, false)
+              }
+            } else if (replyStatus !== 'end') {
+              await updateCard(cardID, partialMessage, true)
             }
           }
-          answer = await createCompletion(userID, content, onProgress)
-          if (!replying) await updateCard(cardID!, answer)
+          chatMessage = await createCompletion(userID, content, onProgress)
+          if (replyStatus === 'noReply') {
+            replyStatus = 'end'
+            await replyCard(messageID, chatMessage, false)
+          }
+
+          if (replyStatus === 'replied') {
+            replyStatus = 'end'
+            await updateCard(cardID!, chatMessage,
+              false)
+          }
           return
         }
       } catch (errorMessage) {

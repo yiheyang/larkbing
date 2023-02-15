@@ -14,7 +14,7 @@ export type SendMessageOptions = {
     re?: string
   }
 
-  onProgress?: (partialResponse: ChatMessage) => void
+  onProgress?: (partialResponse: ChatMessagePartial[]) => void
 }
 
 export interface ChatMessage {
@@ -55,6 +55,12 @@ export interface ChatUpdateArgument {
   result: null
 }
 
+export interface SourceAttribution {
+  providerDisplayName: string
+  seeMoreUrl: string
+  searchQuery: string
+}
+
 export interface ChatMessagePartial {
   text: string
   author: Author
@@ -63,10 +69,35 @@ export interface ChatMessagePartial {
   messageId: string
   offense: string
   adaptiveCards: AdaptiveCard[]
-  sourceAttributions: any[]
   feedback: ChatMessageFeedback
   contentOrigin: string
   privacy?: null
+  messageType?: string
+  sourceAttributions?: SourceAttribution[]
+  suggestedResponses?: SuggestedResponse[]
+}
+
+export interface ChatMessageFull {
+  text: string
+  author: Author
+  from?: ChatMessageFrom
+  createdAt: string
+  timestamp: string
+  locale?: string
+  market?: string
+  region?: string
+  location?: string
+  locationHints?: LocationHint[]
+  messageId: string
+  requestId: string
+  offense: string
+  feedback: ChatMessageFeedback
+  contentOrigin: string
+  privacy?: null
+  inputMethod?: string
+  adaptiveCards?: AdaptiveCard[]
+  sourceAttributions?: SourceAttribution[]
+  suggestedResponses?: SuggestedResponse[]
   messageType?: string
 }
 
@@ -103,30 +134,6 @@ export interface ChatResponseItem {
   conversationExpiryTime: string
   telemetry: Telemetry
   result: ChatRequestResult
-}
-
-export interface ChatMessageFull {
-  text: string
-  author: Author
-  from?: ChatMessageFrom
-  createdAt: string
-  timestamp: string
-  locale?: string
-  market?: string
-  region?: string
-  location?: string
-  locationHints?: LocationHint[]
-  messageId: string
-  requestId: string
-  offense: string
-  feedback: ChatMessageFeedback
-  contentOrigin: string
-  privacy?: null
-  inputMethod?: string
-  adaptiveCards?: AdaptiveCard[]
-  sourceAttributions?: any[]
-  suggestedResponses?: SuggestedResponse[]
-  messageType?: string
 }
 
 export interface ChatMessageFrom {

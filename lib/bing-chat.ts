@@ -53,7 +53,7 @@ export class BingChat {
   async sendMessage (
     text: string,
     opts: types.SendMessageOptions = {}
-  ): Promise<types.ChatMessage> {
+  ) {
     const {
       invocationId = '1',
       onProgress,
@@ -67,19 +67,11 @@ export class BingChat {
 
     if (this.conversationExpired) await this.initConversation()
 
-    const result: types.ChatMessage = {
-      author: 'bot',
-      id: crypto.randomUUID(),
-      conversationId: this.conversationId!,
-      clientId: this.clientId!,
-      conversationSignature: this.conversationSignature!,
-      invocationId: `${parseInt(invocationId, 10) + 1}`,
-      text: ''
-    }
-
-    return new Promise<types.ChatMessage>(
+    return new Promise<types.ChatMessageFull[]>(
       async (resolve, reject) => {
         let received = 0
+        let updateMessages: types.ChatMessagePartial[] = []
+
         const resetRespondTimer = () => {
           this.respondTimer && clearTimeout(this.respondTimer)
           this.respondTimer = setTimeout(() => {
@@ -190,35 +182,20 @@ export class BingChat {
                 const update = message as types.ChatUpdate
                 const msg = update.arguments[0].messages[0]
 
-                if (!msg.messageType) {
-                  result.author = msg.author
-                  result.text = msg.text
-                  result.detail = msg
+                const targetIndex = updateMessages.findIndex(
+                  (item) => item.messageId === msg.messageId)
 
-                  throttledOnProgress?.(result)
+                if (targetIndex === -1) {
+                  updateMessages.push(msg)
+                } else {
+                  updateMessages[targetIndex] = msg
                 }
+
+                throttledOnProgress?.(updateMessages)
               } else if (message.type === 2) {
                 const response = message as types.ChatUpdateCompleteResponse
-                const validMessages = response.item.messages?.filter(
-                  (m) => !m.messageType
-                )
-                const lastMessage = validMessages?.[validMessages?.length - 1]
-
-                if (lastMessage) {
-                  result.conversationId = response.item.conversationId
-                  result.conversationExpiryTime =
-                    response.item.conversationExpiryTime
-
-                  result.author = lastMessage.author
-                  result.text = lastMessage.text
-                  result.detail = lastMessage
-
-                  this.cleanup()
-                  resolve(result)
-                }
-              } else if (message.type === 3) {
                 this.cleanup()
-                resolve(result)
+                resolve(response.item.messages)
               } else {
                 // TODO: handle other message types
               }
