@@ -359,7 +359,6 @@ const cardDispatcher = new lark.CardActionHandler(
         userID, messageID).then()
     }
     return {
-      header: {},
       elements: []
     }
   }
