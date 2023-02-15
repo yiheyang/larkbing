@@ -69,7 +69,7 @@ export class BingChat {
               'cache-control': 'no-cache',
               pragma: 'no-cache'
             },
-            handshakeTimeout: 5000
+            handshakeTimeout: Number(env.BING_HANDSHAKE_TIMEOUT || 5000)
           })
 
         const send = (content: any) => {
@@ -91,7 +91,7 @@ export class BingChat {
           respondTimer = setTimeout(() => {
             terminate()
             reject(new Error(`Message waiting in WebSocket has timed out`))
-          }, 8000)
+          }, Number(env.BING_RESPOND_TIMEOUT || 15000))
         }
 
         ws.on('error', (error) => {
