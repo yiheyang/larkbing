@@ -151,7 +151,9 @@ const generateCard = (
     const suggestedActions = suggestedItems.map((suggestedItem) => {
       return {
         'tag': 'button',
-        'value': suggestedItem.text,
+        'value': {
+          'text': suggestedItem.text
+        },
         'text': {
           'tag': 'plain_text',
           'content': suggestedItem.text
@@ -165,8 +167,6 @@ const generateCard = (
       'actions': suggestedActions
     })
   }
-
-  console.log(result)
 
   return JSON.stringify(result)
 }
