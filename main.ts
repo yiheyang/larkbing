@@ -96,6 +96,7 @@ const generateCard = (
 
   for (const messageItem of messageItems) {
     if (messageItem.type === 'note') {
+      console.log(messageItem)
       result.elements.push({
         'tag': 'note',
         'elements': [
