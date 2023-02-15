@@ -106,20 +106,23 @@ const generateCard = (
         ]
       })
     } else if (messageItem.type === 'answer') {
-      result.elements.push({
-          'tag': 'hr'
-        },
-        {
-          'tag': 'markdown',
-          'content': messageItem.text
-        },
-        {
+      if (result.elements.length > 0) {
+        result.elements.push({
           'tag': 'hr'
         })
+      }
+      result.elements.push({
+        'tag': 'markdown',
+        'content': messageItem.text
+      })
     }
   }
 
   if (referenceItems && referenceItems.length > 0) {
+    result.elements.push({
+      'tag': 'hr'
+    })
+
     const referenceOptions = referenceItems.map((referenceItem) => {
       return {
         'text': {
@@ -162,6 +165,8 @@ const generateCard = (
       'actions': suggestedActions
     })
   }
+
+  console.log(result)
 
   return JSON.stringify(result)
 }
