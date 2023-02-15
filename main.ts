@@ -42,7 +42,7 @@ async function reply (
 }
 
 const generateCard = (
-  messages: (ChatMessagePartial | ChatMessageFull)[], updating = false) => {
+  messages: (ChatMessagePartial | ChatMessageFull)[], updating: boolean) => {
   interface Note {
     type: 'note'
     text: string
@@ -173,7 +173,7 @@ const generateCard = (
 
 async function replyCard (
   messageID: string, chatMessage: (ChatMessagePartial | ChatMessageFull)[],
-  updating = false) {
+  updating: boolean) {
   return await client.im.message.reply({
     path: {
       message_id: messageID
@@ -258,26 +258,31 @@ const eventDispatcher = new lark.EventDispatcher({
           const onProgress = async (partialMessage: ChatMessagePartial[]) => {
             if (replyStatus === 'replying' || replyStatus === 'end') return
             if (!cardID) {
+              console.log('replyCard')
               replyStatus = 'replying'
               cardID = (await replyCard(messageID,
                 partialMessage, true)).data?.message_id
               replyStatus = 'replied'
               if (chatMessage) {
                 replyStatus = 'end'
+                console.log('updateCard finish')
                 await updateCard(cardID!, chatMessage, false)
               }
             } else if (replyStatus !== 'end') {
+              console.log('updateCard')
               await updateCard(cardID, partialMessage, true)
             }
           }
           chatMessage = await createCompletion(userID, content, onProgress)
           if (replyStatus === 'noReply') {
             replyStatus = 'end'
+            console.log('replyCard finish')
             await replyCard(messageID, chatMessage, false)
           }
 
           if (replyStatus === 'replied') {
             replyStatus = 'end'
+            console.log('updateCard finish')
             await updateCard(cardID!, chatMessage,
               false)
           }
