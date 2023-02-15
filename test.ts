@@ -2,7 +2,6 @@ import { BingChat } from './lib'
 
 async function main() {
   const chat = new BingChat()
-  await chat.initConversation()
 
   let prompt = '帮我搜索一下稳定币的政策'
   console.log(prompt)
