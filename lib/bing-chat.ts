@@ -201,7 +201,7 @@ export class BingChat {
                 if (response.item.result.value === 'Success') {
                   resolve(response.item.messages)
                 } else {
-                  reject(new Error(response.item.result.value))
+                  reject(new Error(response.item.result.message))
                 }
               } else {
                 // TODO: handle other message types

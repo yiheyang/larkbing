@@ -175,6 +175,7 @@ export interface SuggestedResponse {
 }
 
 export interface ChatRequestResult {
+  message: string
   value: string
   serviceVersion: string
 }
