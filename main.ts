@@ -102,7 +102,9 @@ const generateCard = (
           `**💾  ${language.toUpperCase()} CODE**\n━━━━━━━━━━━━\n`)
       }
 
-      text = text.replace(/\n```/g, '━━━━━━━━━━━━\n')
+      text = text.replace(/\n```/g, '\n━━━━━━━━━━━━')
+
+      text = text.replace(/\n- /g, '\n🔹 ')
 
       messageItems.push({
         type: 'answer',
