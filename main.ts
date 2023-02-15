@@ -358,7 +358,7 @@ const cardDispatcher = new lark.CardActionHandler(
 
 server.on('request',
   lark.adaptDefault('/event', eventDispatcher, { autoChallenge: true }))
-server.on('request', lark.adaptDefault('/card', cardDispatcher))
+server.on('request', lark.adaptDefault('/card', cardDispatcher, { autoChallenge: true }))
 
 server.listen(env.PORT)
 console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
