@@ -1,6 +1,4 @@
-import express from 'express'
 import * as lark from '@larksuiteoapi/node-sdk'
-import bodyParser from 'body-parser'
 import nodeCache from 'node-cache'
 import dotenv from 'dotenv'
 import {
@@ -17,7 +15,6 @@ dotenv.config()
 const env = process.env
 
 const server = http.createServer();
-
 
 const client = new lark.Client({
   appId: env.LARK_APP_ID || '',
@@ -350,19 +347,8 @@ const cardDispatcher = new lark.CardActionHandler(
   }
 )
 
-server.on('request', lark.adaptDefault('/', eventDispatcher));
+server.on('request', lark.adaptDefault('/event', eventDispatcher));
 server.on('request', lark.adaptDefault('/card', cardDispatcher));
+
 server.listen(env.PORT);
 console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
-
-// app.use('/', lark.adaptExpress(eventDispatcher, {
-//   autoChallenge: true
-// }))
-//
-// app.use('/card', lark.adaptExpress(cardDispatcher, {
-//   autoChallenge: true
-// }))
-//
-// app.listen(env.PORT, () => {
-//   console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
-// })
