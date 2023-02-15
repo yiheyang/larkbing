@@ -81,13 +81,12 @@ const generateCard = (
       const reg = RegExp(/\[\^([0-9]+)\^]/g)
       let result
       while (result = reg.exec(message.text)) {
-        console.log(result)
-        console.log(referenceItems)
         const index = result[1]
         text = text.replace(`[^${index}^]`,
-          `[${index}]` + ((referenceItems && referenceItems[Number(index) - 1])
-            ? `(${referenceItems[Number(index) - 1].seeMoreUrl})`
-            : ''))
+          (referenceItems && referenceItems[Number(index) - 1])
+            ? ` [[${index}]]` +
+            `(${referenceItems[Number(index) - 1].seeMoreUrl})`
+            : ` [${index}]`)
       }
       text = text.replace(/\[\^([0-9]+|)(\^|)/g, '')
       messageItems.push({
