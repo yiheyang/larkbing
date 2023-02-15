@@ -99,10 +99,10 @@ const generateCard = (
       while (result = reg.exec(message.text)) {
         const language = result[1]
         text = text.replace('```' + language + '\n',
-          `[language: ${language}]\n`)
+          `**💾  ${language.toUpperCase()} CODE**\n━━━━━━━━━━━━\n`)
       }
 
-      text = text.replace(/\n```/g, '\n')
+      text = text.replace(/\n```/g, '━━━━━━━━━━━━\n')
 
       messageItems.push({
         type: 'answer',
