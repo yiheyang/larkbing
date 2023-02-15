@@ -355,9 +355,7 @@ app.use('/', lark.adaptExpress(eventDispatcher, {
   autoChallenge: true
 }))
 
-app.use('/card', lark.adaptExpress(cardDispatcher, {
-  autoChallenge: true
-}))
+app.use('/card', lark.adaptExpress(cardDispatcher))
 
 app.listen(env.PORT, () => {
   console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
