@@ -72,7 +72,13 @@ const generateCard = (
         type: 'note',
         text
       })
-    } else if (!message.messageType) {
+    } else if (!message.messageType && message.author === 'user') {
+      const text = `🗣️ ** ${message.text} **`
+      messageItems.push({
+        type: 'note',
+        text
+      })
+    } else if (!message.messageType && message.author === 'bot') {
       referenceItems = message.sourceAttributions
       suggestedItems = message.suggestedResponses
       let text = message.text
