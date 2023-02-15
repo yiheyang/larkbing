@@ -19,6 +19,8 @@ export class BingChat {
 
   ws?: WebSocket
 
+  initializingConversation = false
+  initConversationCallback: [any, any][] = []
   conversationExpired = true
   conversationId?: string
   clientId?: string
@@ -41,6 +43,8 @@ export class BingChat {
     this.respondTimer && clearTimeout(this.respondTimer)
     this.ws?.terminate()
     this.ws = undefined
+    this.initializingConversation = false
+    this.initConversationCallback = []
     this.conversationExpired = true
     this.conversationId = undefined
     this.clientId = undefined
@@ -80,7 +84,7 @@ export class BingChat {
           }, 8000)
         }
 
-        this.ws = new WebSocket(
+        const ws = new WebSocket(
           env.BING_WS_URL || 'wss://sydney.bing.com/sydney/ChatHub', {
             perMessageDeflate: false,
             headers: {
@@ -91,22 +95,20 @@ export class BingChat {
             handshakeTimeout: 5000
           })
 
-        this.ws.on('error', (error) => {
+        ws.on('error', (error) => {
           this.cleanup()
           reject(new Error(`WebSocket error: ${error.toString()}`))
         })
-        this.ws.on('close', () => {
+        ws.on('close', () => {
           this.cleanup()
         })
 
-        this.ws.on('open', () => {
+        ws.on('open', () => {
           resetRespondTimer()
           this.send({ protocol: 'json', version: 1 })
         })
 
-        this.ws.on('message', (data) => {
-          if (this.ws!.readyState !== WebSocket.OPEN) return
-
+        ws.on('message', (data) => {
           const objects = data.toString().split(terminalChar).filter(Boolean)
           if (objects.length === 0) return
 
@@ -208,53 +210,62 @@ export class BingChat {
     )
   }
 
-  async initConversation (): Promise<types.ConversationResult> {
-    const res = await fetch('https://www.bing.com/turing/conversation/create', {
-      headers: {
-        accept: 'application/json',
-        'accept-language': 'en-US,en;q=0.9',
-        'content-type': 'application/json',
-        'sec-ch-ua':
-          '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
-        'sec-ch-ua-arch': '"x86"',
-        'sec-ch-ua-bitness': '"64"',
-        'sec-ch-ua-full-version': '"109.0.1518.78"',
-        'sec-ch-ua-full-version-list':
-          '"Not_A Brand";v="99.0.0.0", "Microsoft Edge";v="109.0.1518.78", "Chromium";v="109.0.5414.120"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-model': '',
-        'sec-ch-ua-platform': '"macOS"',
-        'sec-ch-ua-platform-version': '"12.6.0"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-origin',
-        'x-edge-shopping-flag': '1',
-        'x-ms-client-request-id': crypto.randomUUID(),
-        'x-ms-useragent':
-          'azsdk-js-api-client-factory/1.0.0-beta.1 core-rest-pipeline/1.10.0 OS/MacIntel',
-        cookie: (cookie).includes(';') ? cookie : `_U=${cookie}`
-      },
-      referrer: 'https://www.bing.com/search',
-      referrerPolicy: 'origin-when-cross-origin',
-      body: null,
-      method: 'GET',
-      mode: 'cors',
-      credentials: 'include'
+  initConversation () {
+    return new Promise(async (resolve, reject) => {
+      this.initConversationCallback.push([resolve, reject])
+
+      if (this.initializingConversation) return
+      this.initializingConversation = true
+      const res = await fetch('https://www.bing.com/turing/conversation/create',
+        {
+          headers: {
+            accept: 'application/json',
+            'accept-language': 'en-US,en;q=0.9',
+            'content-type': 'application/json',
+            'sec-ch-ua':
+              '"Not_A Brand";v="99", "Microsoft Edge";v="109", "Chromium";v="109"',
+            'sec-ch-ua-arch': '"x86"',
+            'sec-ch-ua-bitness': '"64"',
+            'sec-ch-ua-full-version': '"109.0.1518.78"',
+            'sec-ch-ua-full-version-list':
+              '"Not_A Brand";v="99.0.0.0", "Microsoft Edge";v="109.0.1518.78", "Chromium";v="109.0.5414.120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-model': '',
+            'sec-ch-ua-platform': '"macOS"',
+            'sec-ch-ua-platform-version': '"12.6.0"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'x-edge-shopping-flag': '1',
+            'x-ms-client-request-id': crypto.randomUUID(),
+            'x-ms-useragent':
+              'azsdk-js-api-client-factory/1.0.0-beta.1 core-rest-pipeline/1.10.0 OS/MacIntel',
+            cookie: (cookie).includes(';') ? cookie : `_U=${cookie}`
+          },
+          referrer: 'https://www.bing.com/search',
+          referrerPolicy: 'origin-when-cross-origin',
+          body: null,
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'include'
+        })
+      if (res.ok) {
+        const result = await res.json()
+        this.conversationExpired = false
+        this.conversationId = result.conversationId
+        this.clientId = result.clientId
+        this.conversationSignature = result.conversationSignature
+        this.isStartOfSession = true
+        this.resetConversationTimer()
+        this.initConversationCallback.forEach(([_res]) => _res())
+      } else {
+        this.initConversationCallback.forEach(([, _rej]) => _rej(new Error(
+          `unexpected HTTP error initConversation ${res.status}: ${res.statusText}`
+        )))
+      }
+      this.initializingConversation = false
+      this.initConversationCallback = []
     })
-    if (res.ok) {
-      const result = await res.json()
-      this.conversationExpired = false
-      this.conversationId = result.conversationId
-      this.clientId = result.clientId
-      this.conversationSignature = result.conversationSignature
-      this.isStartOfSession = true
-      this.resetConversationTimer()
-      return result
-    } else {
-      throw new Error(
-        `unexpected HTTP error initConversation ${res.status}: ${res.statusText}`
-      )
-    }
   }
 
   resetConversationTimer () {
