@@ -85,10 +85,11 @@ const generateCard = (
         console.log(referenceItems)
         const index = result[1]
         text = text.replace(`[^${index}^]`,
-          `[${index}]` + ((referenceItems && referenceItems.length > 0)
+          `[${index}]` + ((referenceItems && referenceItems[Number(index) - 1])
             ? `(${referenceItems[Number(index) - 1].seeMoreUrl})`
             : ''))
       }
+      text = text.replace(/\[\^([0-9]+|)(\^|)/g, '')
       messageItems.push({
         type: 'answer',
         text
