@@ -258,8 +258,7 @@ async function createCompletion (
 }
 
 const eventDispatcher = new lark.EventDispatcher({
-  encryptKey: env.LARK_ENCRYPT_KEY,
-  verificationToken: env.LARK_VERIFICATION_TOKEN
+  encryptKey: env.LARK_ENCRYPT_KEY
 }).register({
   'im.message.receive_v1': async (data) => {
     // check time range
@@ -355,7 +354,9 @@ app.use('/', lark.adaptExpress(eventDispatcher, {
   autoChallenge: true
 }))
 
-app.use('/card', lark.adaptExpress(cardDispatcher))
+app.use('/card', lark.adaptExpress(cardDispatcher, {
+  autoChallenge: true
+}))
 
 app.listen(env.PORT, () => {
   console.info(`[${env.LARK_APP_NAME}] Now listening on port ${env.PORT}`)
