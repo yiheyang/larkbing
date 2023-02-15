@@ -349,10 +349,10 @@ const cardDispatcher = new lark.CardActionHandler(
       data.action.value.text.startsWith('ASK----')) {
       const userID = data.user_id!
       const messageID = data.open_message_id
-      console.log(userID, messageID)
       await messageHandler(data.action.value.text.replace('ASK----', ''),
         userID, messageID)
     }
+    return { code: 0 }
   }
 )
 
