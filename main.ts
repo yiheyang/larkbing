@@ -69,19 +69,28 @@ const generateCard = (
       } else {
         emoji = '💡'
       }
-
       const text = `${emoji} ** ${message.text.replace(/`/g, '*')} **`
       messageItems.push({
         type: 'note',
         text
       })
     } else if (!message.messageType) {
-      messageItems.push({
-        type: 'answer',
-        text: message.text
-      })
       referenceItems = message.sourceAttributions
       suggestedItems = message.suggestedResponses
+      let text = message.text
+      const reg = RegExp(/\[\^([0-9]+)\^]/g)
+      let result
+      while (result = reg.exec(message.text)) {
+        const index = result[1]
+        text = text.replace(`[^${index}^]`,
+          `[${index}]` + ((referenceItems && referenceItems.length > 0)
+            ? `(${referenceItems[Number(index) - 1].seeMoreUrl})`
+            : ''))
+      }
+      messageItems.push({
+        type: 'answer',
+        text
+      })
     }
   }
 
@@ -133,11 +142,12 @@ const generateCard = (
       'tag': 'hr'
     })
 
-    const referenceOptions = referenceItems.map((referenceItem) => {
+    const referenceOptions = referenceItems.map((referenceItem, index) => {
       return {
         'text': {
           'tag': 'plain_text',
-          'content': referenceItem.providerDisplayName
+          'content': `[${index + 1}] ` +
+            (referenceItem.providerDisplayName || referenceItem.searchQuery)
         },
         'value': referenceItem.seeMoreUrl,
         'url': referenceItem.seeMoreUrl
