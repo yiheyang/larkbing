@@ -9,6 +9,7 @@ import {
   ChatMessageFull,
   ChatMessagePartial, SourceAttribution, SuggestedResponse
 } from './lib'
+import { InteractiveCardActionEvent } from '@larksuiteoapi/node-sdk'
 
 const cache = new nodeCache()
 
@@ -338,7 +339,21 @@ const eventDispatcher = new lark.EventDispatcher({
   }
 })
 
+const cardDispatcher = new lark.CardActionHandler(
+  {
+    encryptKey: env.LARK_ENCRYPT_KEY,
+    verificationToken: env.LARK_ENCRYPT_KEY
+  },
+  async (data: InteractiveCardActionEvent) => {
+    console.log(data.action);
+  }
+);
+
 app.use('/', lark.adaptExpress(eventDispatcher, {
+  autoChallenge: true
+}))
+
+app.use('/card', lark.adaptExpress(cardDispatcher, {
   autoChallenge: true
 }))
 
