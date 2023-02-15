@@ -95,11 +95,11 @@ const generateCard = (
 
       text = text.replace(/\[\^([0-9]+|)(\^|)/g, '')
 
-      reg = RegExp(/```(\w*)\n/g)
+      reg = RegExp(/```(\w+)\n/g)
       while (result = reg.exec(message.text)) {
         const language = result[1]
         text = text.replace('```' + language + '\n',
-          language ? `[Code: ${language}]` : `[Code]`)
+          `[language: ${language}]\n`)
       }
 
       text = text.replace(/\n```/g, '\n')
