@@ -258,12 +258,14 @@ async function createCompletion (
 }
 
 const eventDispatcher = new lark.EventDispatcher({
-  encryptKey: env.LARK_ENCRYPT_KEY
+  encryptKey: env.LARK_ENCRYPT_KEY,
+  verificationToken: env.LARK_VERIFICATION_TOKEN
 }).register({
   'im.message.receive_v1': async (data) => {
     // check time range
     let currentTime = Date.now()
-    if (currentTime - Number(data.message.create_time) > 60 * 1000) return { code: 0 }
+    if (currentTime - Number(data.message.create_time) > 60 *
+      1000) return { code: 0 }
 
     // handle each message only once
     const messageID = data.message.message_id
@@ -342,11 +344,12 @@ const eventDispatcher = new lark.EventDispatcher({
 const cardDispatcher = new lark.CardActionHandler(
   {
     encryptKey: env.LARK_ENCRYPT_KEY,
+    verificationToken: env.LARK_VERIFICATION_TOKEN
   },
   async (data: InteractiveCardActionEvent) => {
-    console.log(data.action);
+    console.log(data.action)
   }
-);
+)
 
 app.use('/', lark.adaptExpress(eventDispatcher, {
   autoChallenge: true
