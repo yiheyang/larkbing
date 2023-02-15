@@ -42,6 +42,13 @@ const generateCard = (content: string) => {
       'wide_screen_mode': true,
       'update_multi': true
     },
+    'header': {
+      'title': {
+        'tag': 'plain_text',
+        'content': 'Updating... ⚙️'
+      },
+      'template': 'blue'
+    },
     'elements': [
       {
         'tag': 'note',
@@ -212,6 +219,7 @@ const eventDispatcher = new lark.EventDispatcher({
         } else {
           let cardID: string | undefined
           let replying = false
+          let answer: string | undefined
           const onProgress = async (partialResponse: ChatMessage) => {
             if (replying) return
             if (!cardID) {
@@ -219,12 +227,14 @@ const eventDispatcher = new lark.EventDispatcher({
               cardID = (await replyCard(messageID,
                 partialResponse.text)).data?.message_id
               replying = false
+              if (answer) await updateCard(cardID!, answer)
             } else {
               await updateCard(cardID, partialResponse.text)
             }
           }
-          const answer = await createCompletion(userID, content, onProgress)
-          return await updateCard(cardID!, answer)
+          answer = await createCompletion(userID, content, onProgress)
+          if (!replying) await updateCard(cardID!, answer)
+          return
         }
       } catch (errorMessage) {
         if (typeof errorMessage === 'string') {
