@@ -192,7 +192,7 @@ const generateCard = (
 
   if (suggestedItems && suggestedItems.length > 0) {
     const suggestedActions = suggestedItems.map((suggestedItem) => {
-      return {
+      return suggestedItem.text && {
         'tag': 'button',
         'value': {
           'text': `ASK----${suggestedItem.text}`
@@ -203,7 +203,7 @@ const generateCard = (
         },
         'type': 'primary'
       }
-    })
+    }).filter(Boolean)
 
     result.elements.push({
       'tag': 'action',
