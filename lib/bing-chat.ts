@@ -275,6 +275,6 @@ export class BingChat {
     this.conversationTimer && clearTimeout(this.conversationTimer)
     this.conversationTimer = setTimeout(() => {
       this.cleanup()
-    }, 3600 * 1000 * 24)
+    }, 3600 * 1000 * 6 - 10)
   }
 }
