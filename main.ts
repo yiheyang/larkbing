@@ -26,17 +26,21 @@ const session: Record<string, BingChat> = {}
 
 async function reply (
   messageID: string, content: string) {
-  return await client.im.message.reply({
-    path: {
-      message_id: messageID
-    },
-    data: {
-      content: JSON.stringify({
-        'text': content
-      }),
-      msg_type: 'text'
-    }
-  })
+  try {
+    return await client.im.message.reply({
+      path: {
+        message_id: messageID
+      },
+      data: {
+        content: JSON.stringify({
+          'text': content
+        }),
+        msg_type: 'text'
+      }
+    })
+  } catch (error) {
+    errorHandler(error)
+  }
 }
 
 const generateCard = (
@@ -213,28 +217,36 @@ const generateCard = (
 async function replyCard (
   messageID: string, chatMessage: (ChatMessagePartial | ChatMessageFull)[],
   updating: boolean) {
-  return await client.im.message.reply({
-    path: {
-      message_id: messageID
-    },
-    data: {
-      content: generateCard(chatMessage, updating),
-      msg_type: 'interactive'
-    }
-  })
+  try {
+    return await client.im.message.reply({
+      path: {
+        message_id: messageID
+      },
+      data: {
+        content: generateCard(chatMessage, updating),
+        msg_type: 'interactive'
+      }
+    })
+  } catch (error) {
+    errorHandler(error)
+  }
 }
 
 async function updateCard (
   messageID: string, chatMessage: (ChatMessagePartial | ChatMessageFull)[],
   updating = false) {
-  return await client.im.message.patch({
-    path: {
-      message_id: messageID
-    },
-    data: {
-      content: generateCard(chatMessage, updating)
-    }
-  })
+  try {
+    return await client.im.message.patch({
+      path: {
+        message_id: messageID
+      },
+      data: {
+        content: generateCard(chatMessage, updating)
+      }
+    })
+  } catch (error) {
+    errorHandler(error)
+  }
 }
 
 function errorHandler (error: any) {
@@ -288,7 +300,7 @@ const messageHandler = async (
         if (!cardID) {
           replyStatus = 'replying'
           cardID = (await replyCard(messageID,
-            partialMessage, true)).data?.message_id
+            partialMessage, true))?.data?.message_id
           replyStatus = 'replied'
           if (chatMessage) {
             replyStatus = 'end'
